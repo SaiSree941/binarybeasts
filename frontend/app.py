@@ -17,6 +17,8 @@ if "questions" not in st.session_state:
     st.session_state.questions = []
 if "quiz_generated" not in st.session_state:
     st.session_state.quiz_generated = False
+if "quiz_taken" not in st.session_state:
+    st.session_state.quiz_taken = False
 
 # Generate Explanation
 if st.button("Generate Explanation"):
@@ -34,23 +36,33 @@ if st.button("Generate Explanation"):
             else:
                 st.warning("No audio available.")
 
-            # Generate quiz after explanation
-            with st.spinner("Generating quiz..."):
-                quiz_response = requests.post(QUIZ_URL, json={"topic": topic})
-                quiz_data = quiz_response.json()
-                questions = quiz_data.get("questions", [])
-
-                if questions:
-                    st.session_state.questions = questions
-                    st.session_state.quiz_generated = True
-                else:
-                    st.error("Failed to generate quiz questions.")
+            # Reset quiz state when a new explanation is generated
+            st.session_state.quiz_generated = False
+            st.session_state.quiz_taken = False
 
         except requests.exceptions.RequestException as e:
             st.error(f"Error: {e}. Please ensure the backend is running.")
 
-# Quiz Section
-if st.session_state.quiz_generated:
+# Optional Quiz Section
+if st.button("Take Quiz"):
+    st.session_state.quiz_taken = True
+    with st.spinner("Generating quiz questions..."):
+        try:
+            quiz_response = requests.post(QUIZ_URL, json={"topic": topic})
+            quiz_data = quiz_response.json()
+            questions = quiz_data.get("questions", [])
+
+            if questions:
+                st.session_state.questions = questions
+                st.session_state.quiz_generated = True
+            else:
+                st.error("Failed to generate quiz questions.")
+
+        except requests.exceptions.RequestException as e:
+            st.error(f"Error: {e}. Please ensure the backend is running.")
+
+# Display Quiz if Generated
+if st.session_state.quiz_generated and st.session_state.quiz_taken:
     st.subheader("Test Your Understanding")
     questions = st.session_state.questions
     user_answers = []
@@ -61,7 +73,12 @@ if st.session_state.quiz_generated:
         user_answers.append(user_answer)
 
     if st.button("Submit Quiz"):
-        score = sum(1 for i, q in enumerate(questions) if user_answers[i] == q["answer"]) / len(questions) * 100
+        correct_answers = 0
+        for i, q in enumerate(questions):
+            if user_answers[i].startswith(q["answer"]):
+                correct_answers += 1
+
+        score = (correct_answers / len(questions)) * 100
         st.write(f"🎯 Your Score: {score}%")
 
         if score < 50:
