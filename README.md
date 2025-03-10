@@ -1,5 +1,6 @@
  ###Backend###
 Step 1: Create and Activate Virtual Environment 
+>>>conda create -n shikshak_env python=3.10
 >>>conda activate shikshak_env
 Step 2: Install Dependencies 
 >>>pip install mistral_inference flask gtts
