@@ -7,11 +7,11 @@ from google import genai  # Import Gemini API
 app = Flask(_name_)
 
 # Cohere API Key (for explanation generation)
-COHERE_API_KEY = "your_cohere_api_key_here"
+COHERE_API_KEY = "your_api_key_here"
 COHERE_API_URL = "https://api.cohere.ai/v1/generate"
 
 # Gemini API Key (for quiz generation)
-GEMINI_API_KEY = "your_gemini_api_key_here"  # Replace with actual key
+GEMINI_API_KEY = "your_api_key_here"  # Replace with actual key
 genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 
