@@ -2,28 +2,82 @@ from flask import Flask, request, jsonify
 from gtts import gTTS
 import os
 import requests
+from google import genai  # Import Gemini API
 
-app = Flask(__name__)
+app = Flask(_name_)
 
-# Cohere API key (replace with your actual API key)
-COHERE_API_KEY = "your_api_key_here"
+# Cohere API Key (for explanation generation)
+COHERE_API_KEY = "your_cohere_api_key_here"
 COHERE_API_URL = "https://api.cohere.ai/v1/generate"
 
-# Function to calculate difficulty level
-def calculate_difficulty_level(quiz_scores):
-    if not quiz_scores or not isinstance(quiz_scores, list):
-        return "Beginner"  # Default to Beginner if no scores are provided
+# Gemini API Key (for quiz generation)
+GEMINI_API_KEY = "your_gemini_api_key_here"  # Replace with actual key
+genai_client = genai.Client(api_key=GEMINI_API_KEY)
 
-    avg_score = sum(quiz_scores) / len(quiz_scores)
 
-    if avg_score > 80:
-        return "Advanced"
-    elif avg_score > 50:
-        return "Intermediate"
-    else:
-        return "Beginner"
+# Function to generate explanation using Cohere API
+def generate_dynamic_explanation(topic, level):
+    try:
+        prompt = f"Provide a {level.lower()}-level explanation of {topic} in data science."
+        response = requests.post(
+            COHERE_API_URL,
+            json={"model": "command", "prompt": prompt, "max_tokens": 300, "temperature": 0.7},
+            headers={"Authorization": f"Bearer {COHERE_API_KEY}", "Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        return response.json()["generations"][0]["text"].strip()
 
-# Function to generate audio
+    except Exception as e:
+        print(f"Error with Cohere API: {e}")
+        return f"Fallback explanation for {topic}."
+
+
+# Function to generate quiz using Gemini API
+def generate_quiz_questions(topic):
+    try:
+        prompt = f"""
+        Generate 6 multiple-choice questions (MCQs) about "{topic}".
+        Each question must have 4 options (A, B, C, D) and indicate the correct answer.
+        Format:
+        Question 1: [Question text]
+        A) [Option 1]
+        B) [Option 2]
+        C) [Option 3]
+        D) [Option 4]
+        Answer: [Correct option letter]
+        """
+        response = genai_client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        return parse_quiz_questions(response.text)
+
+    except Exception as e:
+        print(f"Error with Gemini API: {e}")
+        return []
+
+
+# Function to parse quiz text into structured questions
+def parse_quiz_questions(text):
+    questions = []
+    lines = text.split("\n")
+    current_question = None
+
+    for line in lines:
+        if line.startswith("Question"):
+            if current_question:
+                questions.append(current_question)
+            current_question = {"question": line, "options": [], "answer": ""}
+        elif line.startswith(("A)", "B)", "C)", "D)")):
+            if current_question:
+                current_question["options"].append(line)
+        elif line.startswith("Answer:"):
+            if current_question:
+                current_question["answer"] = line.split("Answer:")[1].strip()
+                questions.append(current_question)
+                current_question = None
+
+    return questions
+
+
+# Function to generate audio explanation
 def generate_audio(text, filename):
     try:
         tts = gTTS(text=text, lang='en')
@@ -34,76 +88,36 @@ def generate_audio(text, filename):
         print(f"Error generating audio: {e}")
         return None
 
-# Function to generate a dynamic explanation using Cohere API
-def generate_dynamic_explanation(topic, level):
-    try:
-        # Define the prompt for Cohere API
-        prompt = f"Provide a {level.lower()}-level explanation of the following data science topic: {topic}. " \
-                 f"The explanation should be clear, concise, and suitable for someone with {level.lower()} knowledge."
 
-        # Make a request to the Cohere API
-        response = requests.post(
-            COHERE_API_URL,
-            json={
-                "model": "command",
-                "prompt": prompt,
-                "max_tokens": 300,  # Adjust based on the desired length of the explanation
-                "temperature": 0.7,
-                "k": 0,
-                "stop_sequences": [],
-                "return_likelihoods": "NONE",
-            },
-            headers={
-                "Authorization": f"Bearer {COHERE_API_KEY}",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-        )
-
-        # Check for errors in the API response
-        response.raise_for_status()
-
-        # Extract the generated text from the response
-        generated_text = response.json()["generations"][0]["text"]
-        return generated_text.strip()  # Remove any leading/trailing whitespace
-
-    except Exception as e:
-        print(f"Error fetching explanation from Cohere API: {e}")
-        # Fallback explanation if Cohere API fails
-        return f"This is a {level.lower()}-level explanation of {topic}. (Fallback explanation)"
-
+# API Route to generate explanation
 @app.route('/gen', methods=['POST'])
 def generate_explanation():
     data = request.json
     topic = data.get("topic")
     level = data.get("level")
-    quiz_scores = data.get("quiz_scores", [])
 
-    # Input validation
     if not topic or not level:
         return jsonify({"error": "Topic and level are required"}), 400
 
-    # Adjust difficulty level based on quiz scores
-    adjusted_level = calculate_difficulty_level(quiz_scores)
-
-    # Generate a dynamic explanation using Cohere API
-    explanation = generate_dynamic_explanation(topic, adjusted_level)
-
-    # Generate audio and save it in the static folder
-    audio_filename = f"{topic}_{adjusted_level}"
+    explanation = generate_dynamic_explanation(topic, level)
+    audio_filename = f"{topic}_{level}"
     audio_url = generate_audio(explanation, audio_filename)
 
-    if not audio_url:
-        return jsonify({"error": "Failed to generate audio"}), 500
+    return jsonify({"text": explanation, "audio_url": audio_url})
 
-    return jsonify({
-        "text": explanation,
-        "audio_url": audio_url
-    })
 
-# Ensure the static folder exists
+# API Route to generate quiz
+@app.route('/quiz', methods=['POST'])
+def generate_quiz():
+    data = request.json
+    topic = data.get("topic")
+    questions = generate_quiz_questions(topic)
+    return jsonify({"questions": questions})
+
+
+# Ensure static folder exists
 if not os.path.exists("static"):
     os.makedirs("static")
 
-if __name__ == '__main__':
+if _name_ == '_main_':
     app.run(debug=True, port=9001)
