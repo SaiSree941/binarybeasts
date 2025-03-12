@@ -19,6 +19,8 @@ if "quiz_generated" not in st.session_state:
     st.session_state.quiz_generated = False
 if "quiz_taken" not in st.session_state:
     st.session_state.quiz_taken = False
+if "user_answers" not in st.session_state:
+    st.session_state.user_answers = []
 
 # Generate Explanation
 if st.button("Generate Explanation"):
@@ -39,6 +41,7 @@ if st.button("Generate Explanation"):
             # Reset quiz state when a new explanation is generated
             st.session_state.quiz_generated = False
             st.session_state.quiz_taken = False
+            st.session_state.user_answers = []
 
         except requests.exceptions.RequestException as e:
             st.error(f"Error: {e}. Please ensure the backend is running.")
@@ -68,11 +71,12 @@ if st.session_state.quiz_generated and st.session_state.quiz_taken:
     user_answers = []
 
     for i, q in enumerate(questions):
-        st.write(f"Question {i+1}: {q['question']}")
+        st.write(f"{q['question']}")
         user_answer = st.radio(f"Options for Question {i+1}", q["options"], key=f"q{i}")
         user_answers.append(user_answer)
 
     if st.button("Submit Quiz"):
+        st.session_state.user_answers = user_answers
         correct_answers = 0
         for i, q in enumerate(questions):
             if user_answers[i].startswith(q["answer"]):
