@@ -1,4 +1,4 @@
-# Shikshak Project
+# Shikshak Mahodhay Project
 
 This project consists of a **backend (Flask server)** and a **frontend (Streamlit app)**.
 
