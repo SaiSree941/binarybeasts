@@ -1,6 +1,6 @@
 # Shikshak Mahodhay Project
 
-This project consists of a **backend (Flask server)** and a **frontend (Streamlit app)**.
+This project consists of a **Flask server (backend)** and a **Streamlit app (frontend)**.
 
 ---
 
